@@ -356,9 +356,11 @@ def main():
             #               p=detect_results[0],r=detect_results[1],map50=detect_results[2],map=detect_results[3],
             #               t_inf=times[0], t_nms=times[1])
             msg = 'Epoch: [{0}]    Loss({loss:.3f})\n' \
+                      'Lane line Segment: Acc({ll_seg_acc:.3f})    IOU ({ll_seg_iou:.3f})  mIOU({ll_seg_miou:.3f})\n' \
                       'Detect: P({p:.3f})  R({r:.3f})  mAP@0.5({map50:.3f})  mAP@0.5:0.95({map:.3f})\n'\
                       'Time: inference({t_inf:.4f}s/frame)  nms({t_nms:.4f}s/frame)'.format(
                           epoch,  loss=total_loss,
+                          ll_seg_acc=ll_segment_results[0],ll_seg_iou=ll_segment_results[1],ll_seg_miou=ll_segment_results[2],
                           p=detect_results[0],r=detect_results[1],map50=detect_results[2],map=detect_results[3],
                           t_inf=times[0], t_nms=times[1])
             logger.info(msg)
