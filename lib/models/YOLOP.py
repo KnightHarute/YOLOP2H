@@ -479,25 +479,25 @@ YOLOP = [
 [ -1, BottleneckCSP, [512, 512, 1, False]],     #23
 [ [17, 20, 23], Detect,  [1, [[3,9,5,11,4,20], [7,18,6,39,12,31], [19,50,38,81,68,157]], [128, 256, 512]]], #Detection head 24
 
-[ 16, Conv, [256, 128, 3, 1]],   #25
-[ -1, Upsample, [None, 2, 'nearest']],  #26
-[ -1, BottleneckCSP, [128, 64, 1, False]],  #27
-[ -1, Conv, [64, 32, 3, 1]],    #28
-[ -1, Upsample, [None, 2, 'nearest']],  #29
-[ -1, Conv, [32, 16, 3, 1]],    #30
-[ -1, BottleneckCSP, [16, 8, 1, False]],    #31
-[ -1, Upsample, [None, 2, 'nearest']],  #32
-[ -1, Conv, [8, 2, 3, 1]], #33 Driving area segmentation head
+# [ 16, Conv, [256, 128, 3, 1]],   #25
+# [ -1, Upsample, [None, 2, 'nearest']],  #26
+# [ -1, BottleneckCSP, [128, 64, 1, False]],  #27
+# [ -1, Conv, [64, 32, 3, 1]],    #28
+# [ -1, Upsample, [None, 2, 'nearest']],  #29
+# [ -1, Conv, [32, 16, 3, 1]],    #30
+# [ -1, BottleneckCSP, [16, 8, 1, False]],    #31
+# [ -1, Upsample, [None, 2, 'nearest']],  #32
+# [ -1, Conv, [8, 2, 3, 1]], #33 Driving area segmentation head
 
-[ 16, Conv, [256, 128, 3, 1]],   #34
-[ -1, Upsample, [None, 2, 'nearest']],  #35
-[ -1, BottleneckCSP, [128, 64, 1, False]],  #36
-[ -1, Conv, [64, 32, 3, 1]],    #37
-[ -1, Upsample, [None, 2, 'nearest']],  #38
-[ -1, Conv, [32, 16, 3, 1]],    #39
-[ -1, BottleneckCSP, [16, 8, 1, False]],    #40
-[ -1, Upsample, [None, 2, 'nearest']],  #41
-[ -1, Conv, [8, 2, 3, 1]] #42 Lane line segmentation head
+[ 16, Conv, [256, 128, 3, 1]],   #34 
+[ -1, Upsample, [None, 2, 'nearest']],  #35 
+[ -1, BottleneckCSP, [128, 64, 1, False]],  #36 
+[ -1, Conv, [64, 32, 3, 1]],    #37 
+[ -1, Upsample, [None, 2, 'nearest']],  #38 
+[ -1, Conv, [32, 16, 3, 1]],    #39  
+[ -1, BottleneckCSP, [16, 8, 1, False]],    #40 
+[ -1, Upsample, [None, 2, 'nearest']],  #41 
+[ -1, Conv, [8, 2, 3, 1]] #42 Lane line segmentation head 
 ]
 
 
@@ -509,8 +509,6 @@ class MCnet(nn.Module):
         self.detector_index = -1
         self.det_out_idx = block_cfg[0][0]
         self.seg_out_idx = block_cfg[0][1:]
-        
-
         # Build model
         for i, (from_, block, args) in enumerate(block_cfg[1:]):
             block = eval(block) if isinstance(block, str) else block  # eval strings
@@ -529,13 +527,11 @@ class MCnet(nn.Module):
         Detector = self.model[self.detector_index]  # detector
         if isinstance(Detector, Detect):
             s = 128  # 2x min stride
-            # for x in self.forward(torch.zeros(1, 3, s, s)):
-            #     print (x.shape)
             with torch.no_grad():
                 model_out = self.forward(torch.zeros(1, 3, s, s))
-                detects, _, _= model_out
+                # detects, _, _= model_out
+                detects, _= model_out
                 Detector.stride = torch.tensor([s / x.shape[-2] for x in detects])  # forward
-            # print("stride"+str(Detector.stride ))
             Detector.anchors /= Detector.stride.view(-1, 1, 1)  # Set the anchors for the corresponding scale
             check_anchor_order(Detector)
             self.stride = Detector.stride
@@ -554,12 +550,14 @@ class MCnet(nn.Module):
                 x = cache[block.from_] if isinstance(block.from_, int) else [x if j == -1 else cache[j] for j in block.from_]       #calculate concat detect
             x = block(x)
             if i in self.seg_out_idx:     #save driving area segment result
+            # if i == self.seg_out_idx[1]:     #save driving area segment result
                 m=nn.Sigmoid()
                 out.append(m(x))
             if i == self.detector_index:
                 det_out = x
             cache.append(x if block.index in self.save else None)
         out.insert(0,det_out)
+        # print('size of out:', out.size())
         return out
             
     
@@ -588,7 +586,7 @@ if __name__ == "__main__":
     metric = SegmentationMetric(2)
     model_out,SAD_out = model(input_)
     detects, dring_area_seg, lane_line_seg = model_out
-    Da_fmap, LL_fmap = SAD_out
+    LL_fmap = SAD_out
     for det in detects:
         print(det.shape)
     print(dring_area_seg.shape)

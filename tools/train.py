@@ -204,6 +204,7 @@ def main():
                     print('freezing %s' % k)
                     v.requires_grad = False
 
+
         if cfg.TRAIN.ENC_SEG_ONLY:  # Only train encoder and two segmentation branchs
             logger.info('freeze Det head...')
             for k, v in model.named_parameters():
@@ -239,6 +240,14 @@ def main():
                     print('freezing %s' % k)
                     v.requires_grad = False
         
+        if cfg.TRAIN.DET_LANE_ONLY:
+            logger.info('freeze  Da_Seg heads...')
+            for k, v in model.named_parameters():
+                v.requires_grad = True  # train all layers
+                if k.split(".")[1] in Encoder_para_idx + Det_Head_para_idx:
+                    print('freezing %s' % k)
+                    v.requires_grad = False
+
     if rank == -1 and torch.cuda.device_count() > 1:
         model = torch.nn.DataParallel(model, device_ids=cfg.GPUS)
         # model = torch.nn.DataParallel(model, device_ids=cfg.GPUS).cuda()
@@ -326,24 +335,34 @@ def main():
 
         # evaluate on validation set
         if (epoch % cfg.TRAIN.VAL_FREQ == 0 or epoch == cfg.TRAIN.END_EPOCH) and rank in [-1, 0]:
-            # print('validate')
-            da_segment_results,ll_segment_results,detect_results, total_loss,maps, times = validate(
-                epoch,cfg, valid_loader, valid_dataset, model, criterion,
+        # da_segment_results,ll_segment_results,detect_results, total_loss,maps, times = validate(
+                #     epoch,cfg, valid_loader, valid_dataset, model, criterion,
+                #     final_output_dir, tb_log_dir, writer_dict,
+                #     logger, device, rank
+                # )
+            ll_segment_results,detect_results, total_loss,maps, times = validate(
+                epoch ,cfg, valid_loader, valid_dataset, model, criterion,
                 final_output_dir, tb_log_dir, writer_dict,
                 logger, device, rank
             )
             fi = fitness(np.array(detect_results).reshape(1, -1))  #目标检测评价指标
-
+            # msg = 'Epoch: [{0}]    Loss({loss:.3f})\n' \
+            #           'Driving area Segment: Acc({da_seg_acc:.3f})    IOU ({da_seg_iou:.3f})    mIOU({da_seg_miou:.3f})\n' \
+            #           'Lane line Segment: Acc({ll_seg_acc:.3f})    IOU ({ll_seg_iou:.3f})  mIOU({ll_seg_miou:.3f})\n' \
+            #           'Detect: P({p:.3f})  R({r:.3f})  mAP@0.5({map50:.3f})  mAP@0.5:0.95({map:.3f})\n'\
+            #           'Time: inference({t_inf:.4f}s/frame)  nms({t_nms:.4f}s/frame)'.format(
+            #               epoch,  loss=total_loss, da_seg_acc=da_segment_results[0],da_seg_iou=da_segment_results[1],da_seg_miou=da_segment_results[2],
+            #               ll_seg_acc=ll_segment_results[0],ll_seg_iou=ll_segment_results[1],ll_seg_miou=ll_segment_results[2],
+            #               p=detect_results[0],r=detect_results[1],map50=detect_results[2],map=detect_results[3],
+            #               t_inf=times[0], t_nms=times[1])
             msg = 'Epoch: [{0}]    Loss({loss:.3f})\n' \
-                      'Driving area Segment: Acc({da_seg_acc:.3f})    IOU ({da_seg_iou:.3f})    mIOU({da_seg_miou:.3f})\n' \
-                      'Lane line Segment: Acc({ll_seg_acc:.3f})    IOU ({ll_seg_iou:.3f})  mIOU({ll_seg_miou:.3f})\n' \
                       'Detect: P({p:.3f})  R({r:.3f})  mAP@0.5({map50:.3f})  mAP@0.5:0.95({map:.3f})\n'\
                       'Time: inference({t_inf:.4f}s/frame)  nms({t_nms:.4f}s/frame)'.format(
-                          epoch,  loss=total_loss, da_seg_acc=da_segment_results[0],da_seg_iou=da_segment_results[1],da_seg_miou=da_segment_results[2],
-                          ll_seg_acc=ll_segment_results[0],ll_seg_iou=ll_segment_results[1],ll_seg_miou=ll_segment_results[2],
+                          epoch,  loss=total_loss,
                           p=detect_results[0],r=detect_results[1],map50=detect_results[2],map=detect_results[3],
                           t_inf=times[0], t_nms=times[1])
             logger.info(msg)
+
 
             # if perf_indicator >= best_perf:
             #     best_perf = perf_indicator
