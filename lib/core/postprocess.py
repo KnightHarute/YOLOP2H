@@ -121,6 +121,8 @@ def if_y(samples_x):
     
 def fitlane(mask, sel_labels, labels, stats):
     H, W = mask.shape
+    lane_point= []
+    print(len(sel_labels))
     for label_group in sel_labels:
         states = [stats[k] for k in label_group]
         x, y, w, h, _ = states[0]
@@ -155,10 +157,13 @@ def fitlane(mask, sel_labels, labels, stats):
             # draw_y = draw_y[draw_x < W]
             # draw_x = draw_x[draw_x < W]
             draw_points = (np.asarray([draw_x, draw_y]).T).astype(np.int32)
-            cv2.polylines(mask, [draw_points], False, 1, thickness=15)
+            lane_point.append(draw_points)
+            # cv2.polylines(mask, [draw_points], False, 1, thickness=15)
+            cv2.polylines(mask, [draw_points], False, 1, thickness=5)
         else:
             # if ( + w - 1) >= 1280:
-            samples_x = np.linspace(x, W-1, 30)
+            # samples_x = np.linspace(x, W-1, 30)
+            samples_x = np.linspace(x, W-1, 15)
             # else:
             #     samples_x = np.linspace(x, x_max+w-1, 30)
             samples_y = [np.where(labels[:, int(sample_x)]==t)[0] for sample_x in samples_x]
@@ -189,8 +194,11 @@ def fitlane(mask, sel_labels, labels, stats):
                     draw_x = np.linspace(x, W-1, W-x)
             draw_y = np.polyval(func, draw_x)
             draw_points = (np.asarray([draw_x, draw_y]).T).astype(np.int32)
-            cv2.polylines(mask, [draw_points], False, 1, thickness=15)
-    return mask
+            lane_point.append(draw_points)
+            cv2.polylines(mask, [draw_points], False, 1, thickness=5)
+            # cv2.polylines(mask, [draw_points], False, 1, thickness=15)
+    # return mask
+    return mask, draw_points
 
 def connect_lane(image, shadow_height=0):
     if len(image.shape) == 3:
@@ -207,15 +215,23 @@ def connect_lane(image, shadow_height=0):
     
     for t in range(1, num_labels, 1):
         _, _, _, _, area = stats[t]
+        # if area > 400:
+        #     selected_label.append(t)
         if area > 400:
             selected_label.append(t)
     if len(selected_label) == 0:
-        return mask
+        # return mask
+
+        lane_points = []
+        # mask_post,lane_points = fitlane(mask, split_labels, labels, stats)
+
+        return mask,lane_points
     else:
         split_labels = [[label,] for label in selected_label]
-        mask_post = fitlane(mask, split_labels, labels, stats)
-        return mask_post
-
+        # mask_post = fitlane(mask, split_labels, labels, stats)
+        mask_post,lane_points = fitlane(mask, split_labels, labels, stats)
+        # return mask_post
+        return mask_post,lane_points
 
 
 

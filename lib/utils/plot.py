@@ -37,6 +37,7 @@ def show_seg_result(img, result, index, epoch, save_dir=None, is_ll=False,palett
     assert len(palette.shape) == 2
     
     if not is_demo:
+        # img = cv2.resize(img, (1280,720), interpolation=cv2.INTER_LINEAR)
         color_seg = np.zeros((result.shape[0], result.shape[1], 3), dtype=np.uint8)
         for label, color in enumerate(palette):
             color_seg[result == label, :] = color

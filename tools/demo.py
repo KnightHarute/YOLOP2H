@@ -47,11 +47,12 @@ def detect(cfg,opt):
     if os.path.exists(opt.save_dir):  # output dir
         shutil.rmtree(opt.save_dir)  # delete dir
     os.makedirs(opt.save_dir)  # make new dir
+    os.makedirs(opt.save_dir+'/mask')
     half = device.type != 'cpu'  # half precision only supported on CUDA
 
     # Load model
     model = get_net(cfg)
-    checkpoint = torch.load(opt.weights, map_location= device)
+    checkpoint = torch.load(opt.weights[0], map_location= device)
     model.load_state_dict(checkpoint['state_dict'])
     model = model.to(device)
     if half:
@@ -90,7 +91,9 @@ def detect(cfg,opt):
             img = img.unsqueeze(0)
         # Inference
         t1 = time_synchronized()
-        det_out, da_seg_out,ll_seg_out= model(img)
+        # det_out, da_seg_out,ll_seg_out= model(img)
+        det_out,ll_seg_out= model(img)
+
         t2 = time_synchronized()
         # if i == 0:
         #     print(det_out)
@@ -106,6 +109,8 @@ def detect(cfg,opt):
         det=det_pred[0]
 
         save_path = str(opt.save_dir +'/'+ Path(path).name) if dataset.mode != 'stream' else str(opt.save_dir + '/' + "web.mp4")
+        if dataset.mode != 'stream':
+            mask_save_path = str(opt.save_dir +'/mask'+'/'+ Path(path).name)
 
         _, _, height, width = img.shape
         h,w,_=img_det.shape
@@ -114,10 +119,10 @@ def detect(cfg,opt):
         pad_h = int(pad_h)
         ratio = shapes[1][0][1]
 
-        da_predict = da_seg_out[:, :, pad_h:(height-pad_h),pad_w:(width-pad_w)]
-        da_seg_mask = torch.nn.functional.interpolate(da_predict, scale_factor=int(1/ratio), mode='bilinear')
-        _, da_seg_mask = torch.max(da_seg_mask, 1)
-        da_seg_mask = da_seg_mask.int().squeeze().cpu().numpy()
+        # da_predict = da_seg_out[:, :, pad_h:(height-pad_h),pad_w:(width-pad_w)]
+        # da_seg_mask = torch.nn.functional.interpolate(da_predict, scale_factor=int(1/ratio), mode='bilinear')
+        # _, da_seg_mask = torch.max(da_seg_mask, 1)
+        # da_seg_mask = da_seg_mask.int().squeeze().cpu().numpy()
         # da_seg_mask = morphological_process(da_seg_mask, kernel_size=7)
 
         
@@ -126,11 +131,16 @@ def detect(cfg,opt):
         _, ll_seg_mask = torch.max(ll_seg_mask, 1)
         ll_seg_mask = ll_seg_mask.int().squeeze().cpu().numpy()
         # Lane line post-processing
-        #ll_seg_mask = morphological_process(ll_seg_mask, kernel_size=7, func_type=cv2.MORPH_OPEN)
-        #ll_seg_mask = connect_lane(ll_seg_mask)
-
-        img_det = show_seg_result(img_det, (da_seg_mask, ll_seg_mask), _, _, is_demo=True)
-
+        # ll_seg_mask = morphological_process(ll_seg_mask, kernel_size=7, func_type=cv2.MORPH_OPEN)
+        ll_seg_mask = morphological_process(ll_seg_mask, kernel_size=5, func_type=cv2.MORPH_OPEN)
+        # print(connect_lane(ll_seg_mask).shape)
+        print(len(connect_lane(ll_seg_mask)))
+        # print(connect_lane(ll_seg_mask))
+        ll_seg_mask,lane_point = connect_lane(ll_seg_mask)
+        print(f"Found {len(lane_point)} !")
+        # img_det = show_seg_result(img_det, (da_seg_mask, ll_seg_mask), _, _, is_demo=True)
+        img_det = show_seg_result(img_det, (ll_seg_mask, ll_seg_mask), _, _, is_demo=True)
+        ll_seg_mask_rgb = cv2.cvtColor(ll_seg_mask.astype(np.float32)*127, cv2.COLOR_GRAY2RGB)
         if len(det):
             det[:,:4] = scale_coords(img.shape[2:],det[:,:4],img_det.shape).round()
             for *xyxy,conf,cls in reversed(det):
@@ -139,7 +149,8 @@ def detect(cfg,opt):
         
         if dataset.mode == 'images':
             cv2.imwrite(save_path,img_det)
-
+            print(save_path,mask_save_path)
+            cv2.imwrite(mask_save_path,ll_seg_mask_rgb)
         elif dataset.mode == 'video':
             if vid_path != save_path:  # new video
                 vid_path = save_path

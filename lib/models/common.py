@@ -167,6 +167,9 @@ class Concat(nn.Module):
         """ print("***********************")
         for f in x:
             print(f.shape) """
+        print("***********************")
+        for f in x:
+            print(f.shape)
         return torch.cat(x, self.d)
 
 
